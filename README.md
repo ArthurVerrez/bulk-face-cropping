@@ -4,12 +4,12 @@ Simple utility based on face recognition to crop out a given face out of multipl
 
 The idea is that, if you need to make a dataset with someone's face cropped out properly, it can be very long to do it by hand. The goal is to automate this action.
 
-This utility takes all of the images in a folder, recognizes the input face in the images, crops the pictures and save them in another folder. It works even when there are several people in the picture.
+This utility takes all of the images in a folder, recognizes the input face in the images, crops the pictures and saves them in another folder. It works even when there are several people in the pictures.
 
-This algorithm is entirely based on the [face_recognition package](https://face-recognition.readthedocs.io/en/latest/face_recognition.html).
+This utility is almost entirely based on the [face-recognition package](https://face-recognition.readthedocs.io/en/latest/face_recognition.html).
 
 ## Motivation
-Leveraging [Google Photos' face grouping feature](https://support.google.com/photos/answer/6128838?hl=en&co=GENIE.Platform%3DAndroid), to bunk download all of the pictures of a given person, and training a GAN generate realistic faces.
+Leveraging [Google Photos' face grouping feature](https://support.google.com/photos/answer/6128838?hl=en&co=GENIE.Platform%3DAndroid), to bunk download all of the pictures of a given person, and training a GAN to generate realistic faces.
 It could now be used today to create a database to fine-tune [Stable Diffusion with Dreambooth](https://github.com/XavierXiao/Dreambooth-Stable-Diffusion) for example.
 
 ## Example
