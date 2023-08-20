@@ -1,73 +1,112 @@
-
-#Path to the primary folder
-path="C:/Users/Arthur Verrez/Drive/Projets/Programmation/Python/FaceRecognition/ExtractFaces/"
-
-#Path to the folder containing the images where the face needs to be cropped out of
-to_crop_path=path+"faces_to_crop/"
-
-#Path to the folder containing the cropped images
-save_path=path+"saved_faces/"
-
-import face_recognition
-import imageio
-import numpy as np
-import matplotlib.pyplot as plt
-import math
-import copy
-import scipy.misc
 from os import listdir
 from os.path import isfile, join
+import argparse
+from tqdm import tqdm
+import numpy as np
+import face_recognition
+import imageio.v2 as imageio
+
+IMAGE_EXTENSIONS = ["jpg", "png", "jpeg", "gif", "bmp", ".tif", ".tiff"]
 
 
-#Crop the image im with the variables contained in loc
-# loc  (top, right, bottom, left) 
+# Simple utility function to crop an image given a bounding box
 def crop_image(im, loc):
     (top, right, bottom, left) = loc
-    im_crop=np.zeros((bottom-top, right-left, 3))
+    im_crop = np.zeros((bottom - top, right - left, 3))
     for i in range(top, bottom):
         for j in range(left, right):
-            im_crop[i-top,j-right]=im[i,j]
+            im_crop[i - top, j - right] = im[i, j]
     return im_crop.astype(np.uint8)
 
 
+def extract_faces(input_folder, output_folder, ref_image_path, verbose=False):
+    files_to_crop = [
+        f
+        for f in listdir(input_folder)
+        if isfile(join(input_folder, f))
+        and f.split(".")[-1].lower() in IMAGE_EXTENSIONS
+    ]
+    if verbose:
+        print(
+            f"Found {len(files_to_crop)} picture{'s' if len(files_to_crop)>1 else ''} to crop."
+        )
 
-files_to_crop = [f for f in listdir(to_crop_path) if isfile(join(to_crop_path, f))]
+    ref_image = face_recognition.load_image_file(ref_image_path)
 
-#Image to do the face recognition of the person whose face is to be cropped
-known_image = face_recognition.load_image_file(path+"lolo.jpg")
-known_encoding = face_recognition.face_encodings(known_image)[0]
+    ref_multiple_encodings = face_recognition.face_encodings(ref_image)
+    if len(ref_multiple_encodings) == 0:
+        raise ValueError(f"No face found in reference image: {ref_image_path}")
+    elif len(ref_multiple_encodings) > 1:
+        print(
+            f"Warning: {len(ref_multiple_encodings)} faces found in reference image: {ref_image_path}. Using the first one."
+        )
+
+    ref_encoding = ref_multiple_encodings[0]
+    if verbose:
+        print(f"Loaded reference image and encoding: {ref_image_path}")
+
+    for f in tqdm(files_to_crop):
+        path_to_image = join(input_folder, f)
+        save_path = join(
+            output_folder, "".join(f.split(".")[:-1]) + "-cropped." + f.split(".")[-1]
+        )
+        image = face_recognition.load_image_file(path_to_image)
+
+        encodings = face_recognition.face_encodings(image)
+
+        im = imageio.imread(path_to_image)
+
+        face_locations = face_recognition.face_locations(
+            image
+        )  # (top, right, bottom, left)
+
+        results = face_recognition.compare_faces(encodings, ref_encoding)
+
+        output = None
+
+        for i in range(len(results)):
+            if results[i]:
+                output = crop_image(im, face_locations[i])
+                break
+
+        if output is None:
+            print(f"Warning: no face corresponding to the reference found in {f}")
+            continue
+
+        imageio.imwrite(save_path, output)
+
+    if verbose:
+        print("Done.")
 
 
-#Helps with the names of the cropped images
-max_k=0
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Extract faces from images.")
+    parser.add_argument(
+        "-i",
+        "--input_folder",
+        type=str,
+        required=True,
+        help="Input folder containing the images to crop.",
+    )
+    parser.add_argument(
+        "-o",
+        "--output_folder",
+        type=str,
+        required=True,
+        help="Output folder where the cropped images will be saved.",
+    )
+    parser.add_argument(
+        "-f",
+        "--ref_image_path",
+        type=str,
+        required=True,
+        help="Image containing the face to extract.",
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Display additional information."
+    )
+    args = parser.parse_args()
 
-
-#f will go over the image files to crop
-for f in files_to_crop:
-    image = face_recognition.load_image_file(to_crop_path+f)
-    
-    #Recognize the encodings of the faces in image
-    encodings = face_recognition.face_encodings(image)
-    
-    
-    im = imageio.imread(to_crop_path+f)
-    
-    #Take the face locations in the image, those are in the same order as the encodings
-    face_locations = face_recognition.face_locations(image) # (top, right, bottom, left)
-    
-    #We compare each face in the image with the known encoding
-    results = face_recognition.compare_faces(encodings, known_encoding)
-    
-    n=len(face_locations)
-    im_crop=[]
-    
-    #We only crop the faces that correspond to the known encoding
-    for i in range(len(results)):
-        if(results[i]):
-            im_crop.append(crop_image(im, face_locations[i]))
-    
-    #The cropped images are saved with a unique name
-    for k in range(len(im_crop)):
-        scipy.misc.imsave(save_path+str(k+max_k)+".jpg", im_crop[k])
-    max_k+=len(im_crop)
-
+    extract_faces(
+        args.input_folder, args.output_folder, args.ref_image_path, args.verbose
+    )
